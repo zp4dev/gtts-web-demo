@@ -33,6 +33,7 @@ const el = {
   history: $("history"), clearHistory: $("clearHistory"), status: $("status"),
   analysis: $("analysis"), waveform: $("waveform"),
   waveformWrap: $("waveformWrap"), waveformTime: $("waveformTime"),
+  transcript: $("transcript"), transcriptHint: $("transcriptHint"),
 };
 
 const history = []; // { snippet, lang, url, size, info, timing, loudness }
@@ -41,6 +42,8 @@ let audioContext = null; // tạo trễ, dùng lại cho mọi lần decode
 let current = -1;        // vị trí trong history đang hiển thị
 let playheadFrame = 0;   // id requestAnimationFrame của vòng vẽ playhead
 let hoverRatio = null;   // vị trí chuột trên waveform, 0..1
+let tokenNodes = [];     // <span> của từng từ đang hiển thị
+let activeToken = -2;    // từ đang sáng (-2 = chưa vẽ lần nào)
 
 // ---------- setup ----------
 
@@ -238,6 +241,7 @@ function renderPlayhead() {
   const progress = total > 0 ? Math.min(1, el.audio.currentTime / total) : 0;
   drawWaveform(item.peaks, progress, hoverRatio);
   el.waveformTime.textContent = `${formatClock(el.audio.currentTime)} / ${formatClock(total)}`;
+  updateTranscript(el.audio.currentTime);
 }
 
 // Chỉ chạy vòng rAF khi đang phát, để lúc dừng không tốn CPU.
@@ -257,6 +261,65 @@ function seekFromPointer(event) {
   const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
   el.audio.currentTime = ratio * total;
   renderPlayhead();
+}
+
+// ---------- transcript chạy theo audio ----------
+
+// Dựng lại đúng văn bản gốc: mỗi từ là một <span> bấm được, phần trắng giữa
+// các từ giữ nguyên để xuống dòng và khoảng cách không bị đổi.
+function renderTranscript(item) {
+  el.transcript.replaceChildren();
+  tokenNodes = [];
+  activeToken = -2;
+
+  const tokens = item.tokens ?? [];
+  if (!tokens.length) {
+    el.transcript.textContent = item.text ?? "";
+    el.transcriptHint.hidden = true;
+    return;
+  }
+
+  el.transcriptHint.hidden = false;
+  el.transcriptHint.textContent = item.alignMatched
+    ? "khớp từng câu với đoạn tiếng nói"
+    : "mốc thời gian ước lượng từ tín hiệu audio";
+
+  const text = item.text ?? "";
+  let at = 0;
+  for (const token of tokens) {
+    if (token.at > at) el.transcript.append(text.slice(at, token.at));
+
+    const span = document.createElement("span");
+    span.className = "word";
+    span.textContent = token.text;
+    span.title = `${token.start.toFixed(2)}s`;
+    span.addEventListener("click", () => {
+      el.audio.currentTime = token.start;
+      renderPlayhead();
+      el.audio.play().catch(() => { /* trình duyệt có thể chặn autoplay */ });
+    });
+    el.transcript.append(span);
+    tokenNodes.push(span);
+    at = token.until;
+  }
+  if (at < text.length) el.transcript.append(text.slice(at));
+}
+
+function updateTranscript(time) {
+  const item = history[current];
+  if (!item?.tokens?.length) return;
+
+  const index = Align.activeIndex(item.tokens, time);
+  if (index === activeToken) return; // chỉ đụng DOM khi thật sự đổi từ
+
+  tokenNodes.forEach((node, i) => {
+    node.classList.toggle("active", i === index);
+    node.classList.toggle("done", i < index);
+  });
+  activeToken = index;
+
+  // Văn bản dài thì cuộn theo, nhưng không giật trang khi từ đã nằm trong khung.
+  tokenNodes[index]?.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
 
 // ---------- bảng thông số ----------
@@ -411,14 +474,29 @@ async function generate() {
       console.warn("Web Audio không decode được:", err);
     }
 
+    // Căn chữ theo các đoạn có tiếng thật trong audio (xem align.js).
+    let tokens = [];
+    let segments = [];
+    let alignMatched = false;
+    if (loudness?.samples) {
+      segments = Align.detectSpeechSegments(loudness.samples, loudness.decodedRate);
+      const aligned = Align.alignWords(text, segments, info.ok ? info.duration : loudness.decodedDuration);
+      tokens = aligned.tokens;
+      alignMatched = aligned.matched;
+    }
+
     const blob = new Blob([buffer], { type: "audio/mpeg" });
     addResult({
       snippet: text.length > 70 ? `${text.slice(0, 70)}…` : text,
+      text,
       lang,
       url: URL.createObjectURL(blob),
       size: blob.size,
       info,
       loudness,
+      tokens,
+      segments,
+      alignMatched,
       timing: {
         server: headersAt - started,
         download: downloadedAt - headersAt,
@@ -462,6 +540,7 @@ function play(index, { autoplay = false } = {}) {
     : formatSize(item.size);
 
   renderAnalysis(item);
+  renderTranscript(item);
   // Peaks phụ thuộc bề rộng canvas nên cache kèm bề rộng đã dùng.
   const width = waveformWidth();
   if (item.loudness?.samples && item.peaksWidth !== width) {
@@ -506,6 +585,9 @@ function clearHistory() {
   el.audio.pause();
   el.audio.removeAttribute("src");
   el.analysis.replaceChildren();
+  el.transcript.replaceChildren();
+  tokenNodes = [];
+  activeToken = -2;
   el.result.hidden = true;
   el.empty.hidden = false;
   renderHistory();

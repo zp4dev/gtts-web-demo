@@ -385,6 +385,59 @@ audio {
 
 .ghost:hover { color: var(--text); border-color: var(--accent); }
 
+/* ---------- transcript chạy theo audio ---------- */
+
+.transcript-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.transcript-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11.5px;
+  color: #5d657c;
+}
+
+.transcript {
+  margin: 0;
+  max-height: 132px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+  font-size: 15px;
+  line-height: 1.75;
+  color: #6b7488;
+  white-space: pre-wrap;
+}
+
+.transcript .word {
+  border-radius: 5px;
+  padding: 1px 2px;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.transcript .word:hover { color: var(--text); background: rgba(109, 124, 255, 0.14); }
+
+/* đã đọc qua */
+.transcript .word.done { color: #9aa3ba; }
+
+/* đang đọc */
+.transcript .word.active {
+  color: #0b0d13;
+  background: linear-gradient(140deg, var(--accent), var(--accent-2));
+  font-weight: 600;
+}
+
 /* ---------- waveform + phân tích ---------- */
 
 .waveform-wrap {

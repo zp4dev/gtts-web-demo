@@ -11,6 +11,7 @@ frontend/     Giao diện web
   styles.css  Giao diện tối, responsive
   app.js      Gọi API, quản lý audio + lịch sử
   mp3.js      Parser MPEG frame header (không phụ thuộc thư viện)
+  align.js    Dò đoạn có tiếng + căn chữ theo thời gian phát
   server.py   Static server + proxy /api/* → localhost:8000
 Dockerfile    Chạy cả backend + frontend trong một container
 compose.yaml  Cùng nội dung đó, chạy bằng `docker compose up`
@@ -205,6 +206,7 @@ Backend không bật CORS middleware, nên trình duyệt sẽ chặn request t�
 - Nút mẫu nhanh: Tiếng Việt, English, 日本語, Français
 - Phân tích chi tiết file mp3 trả về (xem dưới) + vẽ dạng sóng
 - Thanh tracing chạy dọc dạng sóng theo tiến độ phát; bấm hoặc rê để tua
+- Chữ sáng theo từng từ khi nghe (xem dưới); bấm vào từ để nhảy tới đúng chỗ
 
 ## Phân tích file MP3
 
@@ -232,6 +234,31 @@ Vài điểm đáng lưu ý khi đọc số liệu:
   thời gian gTTS gọi sang Google Translate, không chỉ thời gian tính toán nội bộ.
 - Frame chứa Xing/Info không mang audio nên bị loại khỏi thời lượng và thống kê bitrate.
 - Output hiện tại của gTTS luôn là **MPEG 2 Layer III, 24 kHz, 64 kbps, mono**.
+
+### Chữ chạy theo audio
+
+Trong lúc phát, từ đang được đọc sáng lên, các từ đã qua chuyển màu nhạt. Bấm vào bất kỳ
+từ nào để nhảy tới đúng đoạn đó.
+
+**Mốc thời gian là ước lượng, không phải dữ liệu do TTS trả về.** `POST /audio` chỉ trả
+mp3, không kèm timestamp, nên `align.js` tự suy ra từ chính tín hiệu âm thanh:
+
+1. Chia audio thành khung 20 ms, tính RMS từng khung.
+2. Ngưỡng đặt tương đối theo file (nền nhiễu ở phân vị 10, đỉnh ở phân vị 95) kèm trễ
+   ngưỡng vào/ra, nên file to nhỏ khác nhau vẫn dùng chung một logic.
+3. Nối các đoạn cách nhau dưới 120 ms, bỏ đoạn ngắn hơn 60 ms → được danh sách
+   **đoạn có tiếng**.
+4. Cắt văn bản theo dấu câu mạnh. Nếu số cụm câu đúng bằng số đoạn tiếng thì ghép 1-1
+   (trường hợp thường gặp với gTTS); không thì dồn các đoạn tiếng thành một trục liên tục
+   rồi rải chữ trên đó theo độ dài từng từ.
+
+Vì bám vào khoảng lặng thật của giọng đọc, chữ không chạy trong lúc im lặng và sai số
+không dồn về cuối câu như cách chia đều tuyến tính. Nhưng trong một cụm dài liền mạch thì
+vị trí từng từ vẫn là suy đoán theo số ký tự — nhãn nhỏ cạnh khung chữ cho biết lần đó
+ghép được 1-1 hay đang rải ước lượng.
+
+Kiểm chứng: đối chiếu với `silencedetect` của ffmpeg, không đoạn tiếng nào chứa khoảng
+lặng mà ffmpeg tìm ra; `"One. Two. Three. Four."` cho đúng 4 đoạn khớp 4 câu.
 
 ### Thanh tracing trên dạng sóng
 

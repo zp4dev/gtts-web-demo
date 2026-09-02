@@ -92,6 +92,12 @@
           <a class="ghost" id="download" download>Tải MP3</a>
         </div>
 
+        <div class="transcript-head">
+          <span>Đang đọc</span>
+          <span class="transcript-hint" id="transcriptHint">mốc thời gian ước lượng từ tín hiệu audio</span>
+        </div>
+        <p class="transcript" id="transcript"></p>
+
         <div class="waveform-wrap" id="waveformWrap">
           <canvas id="waveform" class="waveform" width="900" height="90"></canvas>
           <span class="waveform-time" id="waveformTime">0:00.0 / 0:00.0</span>
@@ -110,6 +116,7 @@
   </footer>
 
   <script src="mp3.js"></script>
+  <script src="align.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
