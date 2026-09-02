@@ -7,3 +7,4 @@ backend/cache/
 .dockerignore
 Dockerfile
 README.md
+compose.yaml

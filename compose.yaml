@@ -1,0 +1,22 @@
+# gTTS web demo — backend (8000) + frontend (3000) trong một container.
+#
+#   docker compose up --build     → http://localhost:3000
+#   docker compose down
+#
+# Tương đương lệnh `docker run` dài trong README, chỉ gọn hơn.
+
+services:
+  demo:
+    build: .
+    image: gtts-demo
+    container_name: gtts-demo
+    ports:
+      - "3000:3000"   # UI  (frontend/server.py, proxy /api/* → backend)
+      - "8000:8000"   # API (FastAPI, /docs)
+    volumes:
+      # READ-ONLY: container không ghi được vào source trên host.
+      # Sửa file ở host → uvicorn --reload tự nạp lại; frontend chỉ cần F5.
+      - ./backend:/app/backend:ro
+      - ./frontend:/app/frontend:ro
+    # Dừng nhanh khi Ctrl-C thay vì đợi hết 10s mặc định.
+    stop_grace_period: 3s

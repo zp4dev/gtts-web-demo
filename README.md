@@ -12,6 +12,7 @@ frontend/     Giao diện web
   app.js      Gọi API, quản lý audio + lịch sử
   server.py   Static server + proxy /api/* → localhost:8000
 Dockerfile    Chạy cả backend + frontend trong một container
+compose.yaml  Cùng nội dung đó, chạy bằng `docker compose up`
 ```
 
 ## Chạy
@@ -58,6 +59,38 @@ Mở <http://localhost:3000> (UI) và <http://localhost:8000/docs> (Swagger).
   chạy uvicorn ở `/app/run` (ghi được) và nạp module qua `PYTHONPATH=/app/backend`,
   nên `backend/` không cần quyền ghi.
 - Ctrl-C dừng cả hai; container cũng tự thoát nếu một trong hai tiến trình chết.
+
+### Docker Compose (gọn hơn)
+
+`compose.yaml` gói sẵn toàn bộ lệnh `docker run` ở trên:
+
+```bash
+docker compose up --build      # build + chạy, log hiện thẳng ra terminal
+```
+
+Mở <http://localhost:3000>. Ctrl-C để dừng.
+
+Các lệnh hay dùng:
+
+```bash
+docker compose up -d --build   # chạy nền
+docker compose logs -f         # xem log khi chạy nền
+docker compose ps              # trạng thái container
+docker compose down            # dừng và xoá container
+docker compose up --build --force-recreate   # build lại từ đầu sau khi sửa Dockerfile
+```
+
+Sửa code trong `backend/` hoặc `frontend/` thì **không cần build lại** — hai thư mục
+được mount read-only vào container, uvicorn tự reload còn frontend chỉ cần F5.
+Chỉ build lại khi đổi `Dockerfile` hoặc `requirements.txt`.
+
+Đổi cổng thì sửa vế trái trong `compose.yaml`, ví dụ `"5173:3000"` để UI chạy ở cổng 5173.
+
+> Compose v2 là plugin của Docker CLI (`docker compose`, có dấu cách). Nếu máy báo
+> `unknown command: docker compose` thì chưa cài plugin:
+> `sudo apt install docker-compose-plugin` (Debian/Ubuntu), hoặc dùng bản standalone
+> cũ với `docker-compose up --build` (có dấu gạch nối). Docker Desktop trên macOS đã
+> có sẵn plugin.
 
 ### Lỗi permission khi chạy Docker
 
