@@ -87,10 +87,16 @@ Chỉ build lại khi đổi `Dockerfile` hoặc `requirements.txt`.
 Đổi cổng thì sửa vế trái trong `compose.yaml`, ví dụ `"5173:3000"` để UI chạy ở cổng 5173.
 
 > Compose v2 là plugin của Docker CLI (`docker compose`, có dấu cách). Nếu máy báo
-> `unknown command: docker compose` thì chưa cài plugin:
-> `sudo apt install docker-compose-plugin` (Debian/Ubuntu), hoặc dùng bản standalone
-> cũ với `docker-compose up --build` (có dấu gạch nối). Docker Desktop trên macOS đã
-> có sẵn plugin.
+> `unknown command: docker compose` thì chưa cài plugin — tên gói tuỳ nguồn cài Docker:
+>
+> | Nguồn Docker | Lệnh cài |
+> | --- | --- |
+> | Gói `docker.io` của Ubuntu/Debian | `sudo apt install docker-compose-v2` |
+> | Repo chính thức của Docker (`docker-ce`) | `sudo apt install docker-compose-plugin` |
+> | macOS | Docker Desktop có sẵn, không cần cài |
+>
+> Kiểm tra nguồn đang dùng: `dpkg -l \| grep -E "docker.io\|docker-ce"`.
+> Cài xong chạy `docker compose version` để xác nhận.
 
 ### Lỗi permission khi chạy Docker
 
