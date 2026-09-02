@@ -385,6 +385,82 @@ audio {
 
 .ghost:hover { color: var(--text); border-color: var(--accent); }
 
+/* ---------- waveform + phân tích ---------- */
+
+.waveform {
+  width: 100%;
+  height: 90px;
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.analysis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.analysis-group {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+  padding: 11px 13px;
+}
+
+.analysis-group h3 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.analysis-group dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, max-content);
+  gap: 4px 10px;
+  align-items: baseline;
+}
+
+.analysis-group dt {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.analysis-group dd {
+  margin: 0;
+  text-align: right;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.analysis-note,
+.analysis-warning {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 12.5px;
+}
+
+.analysis-note {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.analysis-warning {
+  background: rgba(255, 107, 107, 0.10);
+  border: 1px solid rgba(255, 107, 107, 0.32);
+  color: #ffa8a8;
+}
+
 /* ---------- history ---------- */
 
 .history {

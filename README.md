@@ -10,6 +10,7 @@ frontend/     Giao diện web
   index.html  Trang demo
   styles.css  Giao diện tối, responsive
   app.js      Gọi API, quản lý audio + lịch sử
+  mp3.js      Parser MPEG frame header (không phụ thuộc thư viện)
   server.py   Static server + proxy /api/* → localhost:8000
 Dockerfile    Chạy cả backend + frontend trong một container
 compose.yaml  Cùng nội dung đó, chạy bằng `docker compose up`
@@ -202,6 +203,34 @@ Backend không bật CORS middleware, nên trình duyệt sẽ chặn request t�
 - Trình phát tích hợp, tải MP3, lịch sử phiên (bấm để nghe lại)
 - Đèn trạng thái API và hiển thị đúng lỗi backend trả về (400 / 422)
 - Nút mẫu nhanh: Tiếng Việt, English, 日本語, Français
+- Phân tích chi tiết file mp3 trả về (xem dưới) + vẽ dạng sóng
+
+## Phân tích file MP3
+
+Mỗi file trả về được phân tích ngay trong trình duyệt, không gửi đi đâu và không dùng
+thư viện ngoài. `mp3.js` đọc thẳng MPEG frame header, `app.js` decode bằng Web Audio API
+để lấy biên độ.
+
+| Nhóm | Thông số |
+| --- | --- |
+| Định dạng | MPEG version, layer, bitrate, CBR/VBR, tần số lấy mẫu, số kênh, CRC, emphasis |
+| Nội dung | thời lượng, số frame, sample/frame, tổng sample, kích thước, byte ngoài audio |
+| Encoder | tên encoder (LAME/Lavc), Xing/Info/VBRI, delay + padding, thời lượng thô, ID3 |
+| Âm lượng | đỉnh và RMS theo dBFS, khoảng lặng đầu/cuối |
+| Thời gian tạo | backend xử lý, tải về, phân tích, tổng, tốc độ, tỉ lệ so với realtime |
+
+Vài điểm đáng lưu ý khi đọc số liệu:
+
+- **Thời lượng** tính từ frame (`tổng sample / tần số`), không phải ước lượng theo
+  `kích thước / bitrate`, nên đúng với cả file VBR. Đối chiếu với `ffprobe` khớp tới
+  từng mili-giây trên output của gTTS.
+- **Thời lượng thô** là trước khi trừ encoder delay/padding. gTTS không ghi LAME tag nên
+  hai giá trị bằng nhau; file do LAME/ffmpeg tạo thì lệch ~0.05–0.1s — đúng bằng phần
+  player bỏ đi để phát gapless.
+- **Backend xử lý** đo từ lúc gửi request tới lúc header phản hồi về, tức là đã gồm cả
+  thời gian gTTS gọi sang Google Translate, không chỉ thời gian tính toán nội bộ.
+- Frame chứa Xing/Info không mang audio nên bị loại khỏi thời lượng và thống kê bitrate.
+- Output hiện tại của gTTS luôn là **MPEG 2 Layer III, 24 kHz, 64 kbps, mono**.
 
 ## Ghi chú về API
 
