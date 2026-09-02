@@ -1,6 +1,24 @@
+# Python
 __pycache__/
 *.py[cod]
+
+# Virtual environment
 .venv/
 venv/
-backend/cache/
-.DS_Store
+
+# Secrets
+.env
+.env.*
+
+# Proxy lists
+http_proxies.txt
+https_proxies.txt
+
+# Generated audio
+*.mp3
+*.wav
+
+# IDE
+.vscode/
+.idea/
+
