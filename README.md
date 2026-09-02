@@ -59,6 +59,91 @@ Mở <http://localhost:3000> (UI) và <http://localhost:8000/docs> (Swagger).
   nên `backend/` không cần quyền ghi.
 - Ctrl-C dừng cả hai; container cũng tự thoát nếu một trong hai tiến trình chết.
 
+### Lỗi permission khi chạy Docker
+
+**Linux — `permission denied ... /var/run/docker.sock`**
+
+```
+permission denied while trying to connect to the Docker daemon socket
+at unix:///var/run/docker.sock
+
+# bản Docker mới (>= 28) in ra câu hơi khác, cùng một nguyên nhân:
+permission denied while trying to connect to the docker API
+at unix:///var/run/docker.sock
+```
+
+Socket `/var/run/docker.sock` thuộc group `docker`, user của bạn chưa nằm trong group đó.
+Kiểm tra bằng `id -nG | grep docker` (không in ra gì nghĩa là chưa có).
+
+Cách xử lý — chọn 1 trong 3:
+
+1. **Thêm user vào group `docker`** (tiện nhất cho máy dev):
+
+   ```bash
+   sudo usermod -aG docker $USER
+   newgrp docker      # áp dụng cho terminal hiện tại
+   ```
+
+   Đăng xuất/đăng nhập lại (hoặc reboot) để có hiệu lực ở mọi terminal.
+   ⚠️ Group `docker` tương đương quyền root — chỉ làm trên máy cá nhân.
+
+2. **Chạy tạm bằng `sudo`** (không đổi cấu hình hệ thống):
+
+   ```bash
+   sudo docker build -t gtts-demo .
+   sudo docker run --rm -p 3000:3000 -p 8000:8000 \
+       -v "$PWD/backend:/app/backend:ro" \
+       -v "$PWD/frontend:/app/frontend:ro" \
+       gtts-demo
+   ```
+
+   Nếu sau đó lệnh `docker` thường báo lỗi quyền trên `~/.docker`, do `sudo` tạo file
+   thuộc root: `sudo chown -R $USER:$USER ~/.docker`
+
+3. **Dùng rootless Docker** (an toàn nhất, không cần root):
+
+   ```bash
+   dockerd-rootless-setuptool.sh install
+   export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/docker.sock
+   ```
+
+**Linux — `Cannot connect to the Docker daemon. Is the docker daemon running?`**
+
+Daemon chưa chạy, không phải lỗi quyền:
+
+```bash
+sudo systemctl start docker
+sudo systemctl enable docker    # tự chạy khi khởi động máy
+```
+
+**macOS — `Cannot connect to the Docker daemon at unix:///var/run/docker.sock`**
+
+macOS không có group `docker`, nên hầu như không gặp lỗi quyền socket — thường chỉ là
+Docker Desktop chưa chạy. Mở app Docker Desktop và đợi icon cá voi báo *running*, hoặc:
+
+```bash
+open -a Docker            # Docker Desktop
+colima start              # nếu dùng Colima thay Docker Desktop
+```
+
+**macOS — `Mounts denied` / `path is not shared from the host`**
+
+Docker Desktop chỉ mount được thư mục nằm trong danh sách file sharing:
+**Settings → Resources → File sharing** → thêm thư mục chứa project (mặc định đã có
+`/Users`, nên project nằm ngoài `/Users`, ví dụ `/opt` hay ổ ngoài, sẽ bị chặn) →
+*Apply & restart*.
+
+**Cả hai hệ — file mount vào container bị `Permission denied` lúc đọc**
+
+Hai mount trong lệnh trên là read-only (`:ro`), container chỉ cần quyền **đọc**. Nếu
+`backend/` hoặc `frontend/` trên host bị chmod quá chặt thì mở lại quyền đọc:
+
+```bash
+chmod -R a+rX backend frontend
+```
+
+Không cần cấp quyền ghi: container ghi mp3 tạm vào `/app/run/cache` bên trong image.
+
 ## Vì sao cần `server.py`?
 
 Backend không bật CORS middleware, nên trình duyệt sẽ chặn request từ origin khác.
