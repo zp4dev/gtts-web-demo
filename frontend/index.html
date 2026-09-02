@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>gTTS Web Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="glow" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 11v2" />
+        </svg>
+      </span>
+      <div>
+        <h1>gTTS Web Demo</h1>
+        <p>Text-to-speech qua <code>POST /audio</code></p>
+      </div>
+    </div>
+    <div class="status" id="status" data-state="checking">
+      <span class="dot"></span>
+      <span class="status-text">Đang kiểm tra API…</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel composer">
+      <div class="panel-head">
+        <h2>Nội dung</h2>
+        <span class="counter" id="counter"><span id="wordCount">0</span> / 150 từ</span>
+      </div>
+
+      <textarea
+        id="text"
+        placeholder="Nhập văn bản cần chuyển thành giọng nói… (Ctrl + Enter để tạo)"
+        rows="8"
+        spellcheck="false"
+        autofocus></textarea>
+
+      <div class="samples">
+        <span class="samples-label">Thử nhanh:</span>
+        <button type="button" class="chip" data-lang="vi" data-text="Xin chào, đây là bản demo chuyển văn bản thành giọng nói.">Tiếng Việt</button>
+        <button type="button" class="chip" data-lang="en" data-text="Hello there. This is a text to speech demo powered by Google Translate.">English</button>
+        <button type="button" class="chip" data-lang="ja" data-text="こんにちは。これは音声合成のデモです。">日本語</button>
+        <button type="button" class="chip" data-lang="fr" data-text="Bonjour, ceci est une démonstration de synthèse vocale.">Français</button>
+      </div>
+
+      <div class="controls">
+        <label class="field">
+          <span>Ngôn ngữ</span>
+          <select id="lang"></select>
+        </label>
+
+        <button id="generate" class="primary" type="button">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3" />
+          </svg>
+          <span class="label">Tạo audio</span>
+          <kbd>Ctrl ↵</kbd>
+        </button>
+      </div>
+
+      <p class="error" id="error" hidden></p>
+    </section>
+
+    <section class="panel player" id="playerPanel">
+      <div class="panel-head">
+        <h2>Kết quả</h2>
+        <button type="button" class="ghost" id="clearHistory" hidden>Xoá lịch sử</button>
+      </div>
+
+      <div class="empty" id="empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3" />
+        </svg>
+        <p>Chưa có audio nào. Nhập văn bản rồi bấm <strong>Tạo audio</strong>.</p>
+      </div>
+
+      <div class="result" id="result" hidden>
+        <audio id="audio" controls preload="auto"></audio>
+        <div class="result-meta">
+          <span class="badge" id="metaLang">en</span>
+          <span class="meta-size" id="metaSize"></span>
+          <a class="ghost" id="download" download>Tải MP3</a>
+        </div>
+      </div>
+
+      <div class="history" id="history"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Backend: <code id="apiBase">/api/audio</code></span>
+    <a href="http://localhost:8000/docs" target="_blank" rel="noopener">Swagger docs ↗</a>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
