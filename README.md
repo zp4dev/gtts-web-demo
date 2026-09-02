@@ -204,6 +204,7 @@ Backend không bật CORS middleware, nên trình duyệt sẽ chặn request t�
 - Đèn trạng thái API và hiển thị đúng lỗi backend trả về (400 / 422)
 - Nút mẫu nhanh: Tiếng Việt, English, 日本語, Français
 - Phân tích chi tiết file mp3 trả về (xem dưới) + vẽ dạng sóng
+- Thanh tracing chạy dọc dạng sóng theo tiến độ phát; bấm hoặc rê để tua
 
 ## Phân tích file MP3
 
@@ -231,6 +232,20 @@ Vài điểm đáng lưu ý khi đọc số liệu:
   thời gian gTTS gọi sang Google Translate, không chỉ thời gian tính toán nội bộ.
 - Frame chứa Xing/Info không mang audio nên bị loại khỏi thời lượng và thống kê bitrate.
 - Output hiện tại của gTTS luôn là **MPEG 2 Layer III, 24 kHz, 64 kbps, mono**.
+
+### Thanh tracing trên dạng sóng
+
+Phần đã nghe được tô gradient, phần chưa nghe để xám, kèm vạch trắng đánh dấu vị trí
+hiện tại và đồng hồ `đang phát / tổng` ở góc phải.
+
+- **Bấm** vào dạng sóng để nhảy tới vị trí đó, **giữ và rê ngang** để tua liên tục.
+- Rê chuột ngang (không bấm) hiện một vạch mờ xem trước vị trí sắp tua tới.
+- Vòng vẽ dùng `requestAnimationFrame` và chỉ chạy khi đang phát, dừng phát là dừng vẽ.
+- Biên độ từng cột được tính sẵn một lần cho mỗi file (`computePeaks`), mỗi khung hình
+  chỉ vẽ lại các cột nên không phải quét lại toàn bộ sample.
+- Mốc thời lượng lấy từ parser thay vì `audio.duration`, vì thuộc tính này có thể là
+  `NaN` khi metadata chưa nạp xong hoặc `Infinity` với file không có Xing header —
+  đúng trường hợp output của gTTS.
 
 ## Ghi chú về API
 

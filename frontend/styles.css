@@ -387,6 +387,10 @@ audio {
 
 /* ---------- waveform + phân tích ---------- */
 
+.waveform-wrap {
+  position: relative;
+}
+
 .waveform {
   width: 100%;
   height: 90px;
@@ -394,6 +398,24 @@ audio {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--panel-2);
+  cursor: pointer;
+  touch-action: none; /* để pointermove kéo tua không bị trình duyệt cuộn trang */
+}
+
+.waveform:hover { border-color: rgba(109, 124, 255, 0.55); }
+
+.waveform-time {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(11, 13, 19, 0.72);
+  border: 1px solid var(--line);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--muted);
+  pointer-events: none;
 }
 
 .analysis {

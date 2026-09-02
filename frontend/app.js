@@ -32,12 +32,15 @@ const el = {
   download: $("download"), metaLang: $("metaLang"), metaSize: $("metaSize"),
   history: $("history"), clearHistory: $("clearHistory"), status: $("status"),
   analysis: $("analysis"), waveform: $("waveform"),
+  waveformWrap: $("waveformWrap"), waveformTime: $("waveformTime"),
 };
 
 const history = []; // { snippet, lang, url, size, info, timing, loudness }
 
 let audioContext = null; // tạo trễ, dùng lại cho mọi lần decode
 let current = -1;        // vị trí trong history đang hiển thị
+let playheadFrame = 0;   // id requestAnimationFrame của vòng vẽ playhead
+let hoverRatio = null;   // vị trí chuột trên waveform, 0..1
 
 // ---------- setup ----------
 
@@ -133,17 +136,43 @@ async function decodeAudio(buffer) {
   };
 }
 
-function drawWaveform(samples) {
+// Gộp sample thành từng cột min/max theo bề rộng canvas. Tính một lần rồi
+// dùng lại cho mọi khung hình khi phát — mỗi frame chỉ việc vẽ lại các cột.
+function computePeaks(samples, width) {
+  const peaks = new Float32Array(width * 2);
+  const step = samples.length / width;
+  for (let x = 0; x < width; x++) {
+    const from = Math.floor(x * step);
+    const to = Math.min(Math.floor((x + 1) * step), samples.length);
+    let min = 0;
+    let max = 0;
+    for (let i = from; i < to; i++) {
+      if (samples[i] < min) min = samples[i];
+      if (samples[i] > max) max = samples[i];
+    }
+    peaks[x * 2] = min;
+    peaks[x * 2 + 1] = max;
+  }
+  return peaks;
+}
+
+function waveformWidth() {
+  return Math.max(1, Math.round(el.waveform.clientWidth || 900));
+}
+
+// progress/hover là tỉ lệ 0..1; phần đã nghe được tô sáng, phần còn lại xám mờ.
+function drawWaveform(peaks, progress = 0, hover = null) {
   const canvas = el.waveform;
   const ratio = window.devicePixelRatio || 1;
-  const width = canvas.clientWidth || 900;
+  const width = waveformWidth();
   const height = 90;
+
   canvas.width = width * ratio;
   canvas.height = height * ratio;
   canvas.style.height = `${height}px`;
 
   const ctx = canvas.getContext("2d");
-  ctx.scale(ratio, ratio);
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
   ctx.clearRect(0, 0, width, height);
 
   const middle = height / 2;
@@ -153,27 +182,81 @@ function drawWaveform(samples) {
   ctx.lineTo(width, middle);
   ctx.stroke();
 
-  if (!samples) return;
+  if (!peaks) return;
 
-  const step = samples.length / width;
+  const headX = Math.round(progress * width);
   const gradient = ctx.createLinearGradient(0, 0, width, 0);
   gradient.addColorStop(0, "#6d7cff");
   gradient.addColorStop(1, "#29d3b0");
-  ctx.fillStyle = gradient;
 
-  for (let x = 0; x < width; x++) {
-    let min = 1;
-    let max = -1;
-    const from = Math.floor(x * step);
-    const to = Math.min(Math.floor((x + 1) * step), samples.length);
-    for (let i = from; i < to; i++) {
-      if (samples[i] < min) min = samples[i];
-      if (samples[i] > max) max = samples[i];
-    }
-    if (from >= to) continue;
+  const columns = Math.min(width, peaks.length / 2);
+  for (let x = 0; x < columns; x++) {
+    const min = peaks[x * 2];
+    const max = peaks[x * 2 + 1];
     const top = middle - max * middle * 0.92;
-    ctx.fillRect(x, top, 1, Math.max(1, (max - min) * middle * 0.92));
+    const barHeight = Math.max(1, (max - min) * middle * 0.92);
+    ctx.fillStyle = x < headX ? gradient : "rgba(139, 147, 167, 0.42)";
+    ctx.fillRect(x, top, 1, barHeight);
   }
+
+  if (hover !== null) {
+    const hoverX = Math.round(hover * width);
+    ctx.fillStyle = "rgba(231, 233, 240, 0.22)";
+    ctx.fillRect(hoverX, 0, 1, height);
+  }
+
+  if (progress > 0 || !el.audio.paused) {
+    ctx.fillStyle = "#e7e9f0";
+    ctx.fillRect(Math.min(headX, width - 2), 0, 2, height);
+    ctx.fillStyle = "#29d3b0";
+    ctx.fillRect(Math.min(headX, width - 2) - 1, 0, 4, 3);
+    ctx.fillRect(Math.min(headX, width - 2) - 1, height - 3, 4, 3);
+  }
+}
+
+function formatClock(seconds) {
+  if (!Number.isFinite(seconds)) return "0:00.0";
+  const mm = Math.floor(seconds / 60);
+  const ss = seconds - mm * 60;
+  return `${mm}:${ss.toFixed(1).padStart(4, "0")}`;
+}
+
+// Thời lượng lấy từ parser: chính xác hơn audio.duration, vốn có thể là NaN
+// lúc metadata chưa nạp xong hoặc Infinity với stream không có Xing header.
+function trackDuration() {
+  const item = history[current];
+  const parsed = item?.info?.ok ? item.info.duration : 0;
+  return Number.isFinite(el.audio.duration) && el.audio.duration > 0
+    ? el.audio.duration
+    : parsed;
+}
+
+function renderPlayhead() {
+  const item = history[current];
+  if (!item) return;
+  const total = trackDuration();
+  const progress = total > 0 ? Math.min(1, el.audio.currentTime / total) : 0;
+  drawWaveform(item.peaks, progress, hoverRatio);
+  el.waveformTime.textContent = `${formatClock(el.audio.currentTime)} / ${formatClock(total)}`;
+}
+
+// Chỉ chạy vòng rAF khi đang phát, để lúc dừng không tốn CPU.
+function startPlayheadLoop() {
+  cancelAnimationFrame(playheadFrame);
+  const tick = () => {
+    renderPlayhead();
+    if (!el.audio.paused && !el.audio.ended) playheadFrame = requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+function seekFromPointer(event) {
+  const total = trackDuration();
+  if (!total) return;
+  const rect = el.waveform.getBoundingClientRect();
+  const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+  el.audio.currentTime = ratio * total;
+  renderPlayhead();
 }
 
 // ---------- bảng thông số ----------
@@ -379,7 +462,14 @@ function play(index, { autoplay = false } = {}) {
     : formatSize(item.size);
 
   renderAnalysis(item);
-  drawWaveform(item.loudness?.samples);
+  // Peaks phụ thuộc bề rộng canvas nên cache kèm bề rộng đã dùng.
+  const width = waveformWidth();
+  if (item.loudness?.samples && item.peaksWidth !== width) {
+    item.peaks = computePeaks(item.loudness.samples, width);
+    item.peaksWidth = width;
+  }
+  el.audio.currentTime = 0;
+  renderPlayhead();
 
   if (autoplay) el.audio.play().catch(() => { /* autoplay may be blocked */ });
 
@@ -435,11 +525,49 @@ el.text.addEventListener("keydown", (event) => {
 el.generate.addEventListener("click", generate);
 el.clearHistory.addEventListener("click", clearHistory);
 
-// Canvas vẽ theo pixel thật nên phải vẽ lại khi khung đổi kích thước.
+// --- playhead: bám theo audio và cho phép tua bằng chuột ---
+
+el.audio.addEventListener("play", startPlayheadLoop);
+for (const event of ["pause", "ended", "seeked", "loadedmetadata"]) {
+  el.audio.addEventListener(event, renderPlayhead);
+}
+
+el.waveform.addEventListener("pointerdown", (event) => {
+  el.waveform.setPointerCapture(event.pointerId);
+  seekFromPointer(event);
+});
+
+el.waveform.addEventListener("pointermove", (event) => {
+  const rect = el.waveform.getBoundingClientRect();
+  hoverRatio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+  // Giữ nút chuột và rê ngang = tua liên tục.
+  if (el.waveform.hasPointerCapture(event.pointerId)) seekFromPointer(event);
+  else renderPlayhead();
+});
+
+el.waveform.addEventListener("pointerup", (event) => {
+  el.waveform.releasePointerCapture(event.pointerId);
+});
+
+el.waveform.addEventListener("pointerleave", () => {
+  hoverRatio = null;
+  renderPlayhead();
+});
+
+// Canvas vẽ theo pixel thật nên phải dựng lại peaks khi khung đổi kích thước.
 let resizeTimer;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => drawWaveform(history[current]?.loudness?.samples), 120);
+  resizeTimer = setTimeout(() => {
+    const item = history[current];
+    if (!item?.loudness?.samples) return;
+    const width = waveformWidth();
+    if (item.peaksWidth !== width) {
+      item.peaks = computePeaks(item.loudness.samples, width);
+      item.peaksWidth = width;
+    }
+    renderPlayhead();
+  }, 120);
 });
 
 for (const chip of document.querySelectorAll(".chip")) {
