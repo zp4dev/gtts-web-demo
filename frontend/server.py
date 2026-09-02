@@ -5,10 +5,12 @@ browser stays on a single origin (the backend has no CORS middleware).
 
     python frontend/server.py            # http://localhost:3000
     python frontend/server.py --port 5173 --backend http://localhost:8000
+    python frontend/server.py --host 0.0.0.0    # reachable from outside (Docker)
 """
 
 import argparse
 import json
+import os
 import urllib.error
 import urllib.request
 from functools import partial
@@ -85,13 +87,16 @@ class DemoHandler(SimpleHTTPRequestHandler):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", type=int, default=3000)
-    parser.add_argument("--backend", default=BACKEND, help="FastAPI base URL")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 3000)))
+    parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
+    parser.add_argument("--backend", default=os.environ.get("BACKEND_URL", BACKEND),
+                        help="FastAPI base URL")
     args = parser.parse_args()
 
     handler = partial(DemoHandler, backend=args.backend)
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
-    print(f"gTTS web demo  →  http://localhost:{args.port}")
+    server = ThreadingHTTPServer((args.host, args.port), handler)
+    shown = "localhost" if args.host in ("127.0.0.1", "0.0.0.0") else args.host
+    print(f"gTTS web demo  →  http://{shown}:{args.port}")
     print(f"proxying /api/* →  {args.backend}")
     try:
         server.serve_forever()

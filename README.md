@@ -11,6 +11,7 @@ frontend/     Giao diện web
   styles.css  Giao diện tối, responsive
   app.js      Gọi API, quản lý audio + lịch sử
   server.py   Static server + proxy /api/* → localhost:8000
+Dockerfile    Chạy cả backend + frontend trong một container
 ```
 
 ## Chạy
@@ -36,6 +37,27 @@ python frontend/server.py
 Mở <http://localhost:3000>.
 
 Tuỳ chọn: `python frontend/server.py --port 5173 --backend http://localhost:8000`
+
+## Chạy bằng Docker (một container, cả hai service)
+
+```bash
+docker build -t gtts-demo .
+docker run --rm -p 3000:3000 -p 8000:8000 \
+    -v "$PWD/backend:/app/backend:ro" \
+    -v "$PWD/frontend:/app/frontend:ro" \
+    gtts-demo
+```
+
+Mở <http://localhost:3000> (UI) và <http://localhost:8000/docs> (Swagger).
+
+- Backend chạy `uvicorn main:app --reload`, frontend chạy `server.py` — cùng một container.
+- Hai volume mount **read-only**: container không ghi được vào source trên host.
+  Sửa file ở host → uvicorn tự reload; frontend chỉ cần F5. Bỏ hai `-v` thì vẫn chạy
+  bằng source đã COPY trong image.
+- `main.py` lưu mp3 vào `cache` — đường dẫn **tương đối theo thư mục làm việc**. Container
+  chạy uvicorn ở `/app/run` (ghi được) và nạp module qua `PYTHONPATH=/app/backend`,
+  nên `backend/` không cần quyền ghi.
+- Ctrl-C dừng cả hai; container cũng tự thoát nếu một trong hai tiến trình chết.
 
 ## Vì sao cần `server.py`?
 
